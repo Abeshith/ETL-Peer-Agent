@@ -1,0 +1,9 @@
+.env
+testagent/
+debug/
+config.yaml.bak
+out.txt
+Business Logic.txt
+outputs/
+setup/
+__pycache__/

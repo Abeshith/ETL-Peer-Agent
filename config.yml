@@ -1,0 +1,102 @@
+dev:
+  blob_storage:
+    container_name: hospitaldata
+    folder_prefix: hospital
+    secret_name: blob-connection-secret
+    storage_account: etltestcase
+  key_vault: etl-test-agent-kv
+  snowflake:
+  - account: CBRSTRP-SN94693
+    database: LANDING
+    private_key:
+      local_file: rsa_key.p8
+    role: ACCOUNTADMIN
+    schema: LND
+    stage: hospitaldata
+    tables:
+    - blob_path: hospitaldata_{DATE}.csv
+      file_format: my_csv_format
+      name: raw_data
+      on_error: CONTINUE
+    - blob_path: audit_log_{DATE}.csv
+      file_format: my_csv_format
+      name: audit_log
+      on_error: CONTINUE
+    user: ABESHITH
+    warehouse: COMPUTE_WH
+dev_v1:
+  blob_storage:
+    container_name: hospitaldata
+    folder_prefix: hospital
+    secret_name: blob-connection-secret
+    storage_account: etltestcase
+  key_vault: etl-test-agent-kv
+  snowflake:
+  - account: CBRSTRP-SN94693
+    database: LANDING
+    private_key:
+      local_file: rsa_key.p8
+    role: ACCOUNTADMIN
+    schema: LND
+    stage: hospitaldata
+    tables:
+    - blob_path: hospitaldata_{DATE}.csv
+      file_format: my_csv_format
+      name: raw_data
+      on_error: CONTINUE
+    - blob_path: audit_log_{DATE}.csv
+      file_format: my_csv_format
+      name: audit_log
+      on_error: CONTINUE
+    user: ABESHITH
+    warehouse: COMPUTE_WH
+dev_v2:
+  blob_storage:
+    container_name: hospitaldata
+    folder_prefix: hospital
+    secret_name: blob-connection-secret
+    storage_account: etltestcase
+  key_vault: etl-test-agent-kv
+  snowflake:
+  - account: NOZDSKV-PV21943
+    database: ETL_RAW
+    private_key:
+      secret_name: snowflake-private-key-v2
+    role: ACCOUNTADMIN
+    schema: LIGHTBOX
+    stage: hospitaldata
+    tables:
+    - blob_path: hospitaldata_{DATE}.csv
+      file_format: my_csv_format
+      name: PARCELS_UUID
+      on_error: CONTINUE
+    - blob_path: assessments_{DATE}.csv
+      file_format: my_csv_format
+      name: ASSESSMENTS_UUID
+      on_error: CONTINUE
+    user: ABESHITH
+    warehouse: COMPUTE_WH
+dev_v3:
+  blob_storage:
+    container_name: gem-geojson-data
+    base_prefix: global_energy_monitor
+    target_prefix: processed
+    secret_name: blob-connection-secret
+    storage_account: etltestcase
+  key_vault: etl-test-agent-kv
+  load:
+    pattern_ext: \.geojson
+  snowflake:
+  - account: OGQRJWE-KR90576
+    database: LANDING
+    schema: LND
+    stage: GLOBAL_ENERGY_MONITOR_STAGE
+    storage_integration: ETL_PRODUCT_INTEGRATION_LND
+    term_target_table: LNG_TERMINALS
+    pipe_target_table: GAS_PIPELINES
+    load_mode: replace
+    user: ABESHITH
+    role: ACCOUNTADMIN
+    warehouse: COMPUTE_WH
+    private_key:
+      secret_name: snowflake-private-key-v3
