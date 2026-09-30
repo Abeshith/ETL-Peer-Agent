@@ -13,7 +13,7 @@ import yaml
 sys.path.append(str(Path(__file__).parent.absolute()))
 
 st.set_page_config(
-    page_title="ETL Validation Agent | CGI",
+    page_title="Smart Review - ETL | CGI",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -113,36 +113,39 @@ html, body, [class*="css"] {
   margin-bottom: 1.2rem;
 }
 
+/* ── Standalone CGI Logo ─────────────────────────────────────────────── */
+.cgi-standalone-logo-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  padding: 0.1rem 0;
+}
+
+.cgi-standalone-logo {
+  background: var(--cgi-red);
+  color: #FFFFFF;
+  font-weight: 900;
+  font-size: 1.35rem;
+  letter-spacing: 0.12em;
+  padding: 0.4rem 0.95rem;
+  border-radius: 6px;
+  line-height: 1;
+  box-shadow: 0 2px 5px rgba(227, 25, 55, 0.28);
+  display: inline-block;
+}
+
 /* ── Branded Header Card ─────────────────────────────────────────────── */
 .cgi-header-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.4rem;
+  padding: 1.1rem 1.5rem;
   background: linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 100%);
   border: 1px solid var(--cgi-white-700);
   border-left: 6px solid var(--cgi-purple);
   border-radius: 8px;
   margin-bottom: 1.5rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.cgi-header-left {
-  display: flex;
-  align-items: center;
-  gap: 1.1rem;
-}
-
-.cgi-logo {
-  background: var(--cgi-red);
-  color: #FFFFFF;
-  font-weight: 900;
-  font-size: 1.35rem;
-  letter-spacing: 0.12em;
-  padding: 0.4rem 0.85rem;
-  border-radius: 6px;
-  line-height: 1;
-  box-shadow: 0 2px 4px rgba(227, 25, 55, 0.25);
 }
 
 .cgi-header-title-text h1 {
@@ -396,16 +399,16 @@ div[data-testid="stExpander"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ── Top Brand Gradient Bar & Header ──────────────────────────────────────────
+# ── Top Brand Gradient Bar & Standalone Logo & Header ────────────────────────
 st.markdown("""
 <div class="cgi-brand-bar"></div>
+<div class="cgi-standalone-logo-container">
+  <div class="cgi-standalone-logo">CGI</div>
+</div>
 <div class="cgi-header-banner">
-  <div class="cgi-header-left">
-    <div class="cgi-logo">CGI</div>
-    <div class="cgi-header-title-text">
-      <h1>ETL Validation Agent</h1>
-      <p>Azure Blob → Snowflake Landing DB Verification Suite</p>
-    </div>
+  <div class="cgi-header-title-text">
+    <h1>Smart Review - ETL</h1>
+    <p>Azure Blob → Snowflake Landing DB Verification Suite</p>
   </div>
   <div class="cgi-stage-badge">Stage 1 Validator</div>
 </div>
