@@ -16,10 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--env', dest='env', type=str, help='Project Environment')
 args = parser.parse_args()
 
-if args.env.lower() not in ['dev_v2', 'dev_v2_new']:
-    raise Exception(f"{args.env.lower()} is not a valid environment. Valid options are dev_v2 or dev_v2_new.")
-
-env = args.env.lower()
+env = args.env.lower() if args.env else 'dev'
 with open(f'{Path(__file__).parent.absolute()}/config.yml', 'r') as stream:
     etl_configuration = yaml.safe_load(stream)[env]
 

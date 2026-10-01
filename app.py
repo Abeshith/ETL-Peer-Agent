@@ -439,26 +439,6 @@ with st.sidebar:
     etl_file = st.file_uploader("ETL Python File (.py)", type=["py"])
     config_file = st.file_uploader("Config File (.yml / .yaml)", type=["yml", "yaml"])
 
-    env_key = "dev_v1"
-    if config_file:
-        try:
-            cfg_bytes = config_file.read()
-            config_file.seek(0)
-            parsed = yaml.safe_load(cfg_bytes)
-            if isinstance(parsed, dict):
-                env_options = [k for k, v in parsed.items() if isinstance(v, dict)]
-                if env_options:
-                    env_key = st.selectbox("Environment Key", env_options)
-                else:
-                    env_key = st.text_input("Environment Key", value="dev_v1")
-            else:
-                env_key = st.text_input("Environment Key", value="dev_v1")
-        except Exception:
-            env_key = st.text_input("Environment Key", value="dev_v1")
-    else:
-        env_key = st.text_input("Environment Key", value="dev_v1",
-                                help="Must match a top-level key in your config (e.g. dev_v1, dev_v2)")
-
     run_date = st.text_input("Run Date (optional)", placeholder="YYYYMMDD",
                              help="Leave blank to skip --run_date argument")
 
@@ -472,32 +452,18 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Version selector — auto-populated from Business Logic.txt blocks
-    biz_version = None
-    if _biz_blocks:
-        biz_version = st.selectbox(
-            "Load rules from Business Logic.txt",
-            options=["(none)"] + list(_biz_blocks.keys()),
-            help="Select a version block to pre-fill the rules below",
-        )
-
-    # Pre-fill textarea from selected block
-    _default_rules = ""
-    if biz_version and biz_version != "(none)" and biz_version in _biz_blocks:
-        _default_rules = "\n".join(_biz_blocks[biz_version])
-
     rules_text = st.text_area(
         "Rules (one per line)",
-        value=_default_rules,
+        value="",
         height=180,
-        help="Each line is one business rule evaluated against the ETL run",
+        help="Enter business rules to evaluate against the ETL run",
     )
 
     run_btn = st.button("▶ Run Validation", type="primary", use_container_width=True)
 
 # ── Main area ─────────────────────────────────────────────────────────────────
 if not run_btn:
-    st.info("Upload your ETL Python file and configuration YAML in the left panel, configure business rules, then click **▶ Run Validation** to begin the verification suite.")
+    st.info("Upload your ETL Python file and configuration YAML in the left panel, then click **▶ Run Validation** to begin the verification suite.")
     st.stop()
 
 if not etl_file:
@@ -507,16 +473,36 @@ if not config_file:
     st.error("Please upload a Config file.")
     st.stop()
 
-# Parse business rules — strip blank lines
+# Auto-extract environment key from config file
+env_key = None
+try:
+    cfg_bytes = config_file.read()
+    parsed = yaml.safe_load(cfg_bytes)
+    if isinstance(parsed, dict):
+        env_options = [k for k, v in parsed.items() if isinstance(v, dict)]
+        if env_options:
+            env_key = env_options[0]  # Use first environment key
+        else:
+            st.error("Config file does not contain any valid environment keys.")
+            st.stop()
+    else:
+        st.error("Config file is not a valid YAML dictionary.")
+        st.stop()
+except Exception as e:
+    st.error(f"Failed to parse config file: {e}")
+    st.stop()
+
+st.info(f"🔧 Using environment: **{env_key}**")
+
+# Parse business rules from textbox
 business_rules = [r.strip() for r in rules_text.splitlines() if r.strip()] if rules_text else []
 
 # Write uploaded files to a temp directory inside test_samples/ so relative imports resolve
 tmp_dir = Path(tempfile.mkdtemp(dir=Path(__file__).parent / "test_samples"))
 etl_path = tmp_dir / etl_file.name
-config_path = tmp_dir / config_file.name
+config_path = tmp_dir / "config.yml"  # Always write as config.yml (V1 expects this exact name)
 etl_path.write_bytes(etl_file.read())
-config_file.seek(0)
-config_path.write_bytes(config_file.read())
+config_path.write_bytes(cfg_bytes)  # Use cfg_bytes already read above
 
 # Symlink/copy utils and src packages into tmp_dir so ETL imports resolve
 project_root = Path(__file__).parent

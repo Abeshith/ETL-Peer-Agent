@@ -20,9 +20,6 @@ parser.add_argument('--env', dest='env', type=str, required=True, help='Project 
 parser.add_argument('--run_date', dest='run_date', type=str, required=True, help='Run Date (YYYYMMDD format)')
 args = parser.parse_args()
 
-if args.env.lower() not in ['dev_v1']:
-    raise Exception(f"{args.env.lower()} is not a valid environment. Valid options are only dev_v1.")
-
 
 
 with open(f'{Path(__file__).parent.absolute()}/config.yml', 'r') as stream:

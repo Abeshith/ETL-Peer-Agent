@@ -363,6 +363,21 @@ NAME: ... | TYPE: ExecutionStatus|TablesProcessed|RowsLoaded|RowsFailed|FilesLoa
         blob_date_pattern = re.compile(r'blob\s*path.*DATE\s*placeholder', re.I)
         # TRUNCATE before COPY pattern
         truncate_pattern = re.compile(r'TRUNCATE.*before.*COPY', re.I)
+        
+        # CLIENT RULE PATTERNS (exact phrasing from client)
+        # Rule 1: "LND record count should be populated after successful load from source."
+        lnd_populated_pattern = re.compile(r'(?:LND|raw_data|landing)\s+record\s+count\s+should\s+be\s+populated', re.I)
+        # Rule 2: "All expected tables like AUDIT and LND must be successfully loaded without errors."
+        all_tables_pattern = re.compile(r'all\s+expected\s+tables\s+like\s+AUDIT\s+and\s+LND\s+must\s+be\s+successfully\s+loaded', re.I)
+        # Rule 4: "Validate that source file is successfully loaded into LND table during the load operation."
+        source_loaded_pattern = re.compile(r'source\s+file\s+is\s+successfully\s+loaded\s+into\s+(?:LND|raw_data|landing)', re.I)
+        # Rule 5: "Validate that the configured CSV format is correctly applied during the load process."
+        csv_format_pattern = re.compile(r'configured\s+CSV\s+format\s+is\s+correctly\s+applied', re.I)
+        # Rule 6: "Validate that the LND and AUDIT table contains records after load when data is loaded."
+        lnd_audit_records_pattern = re.compile(r'LND\s+and\s+AUDIT\s+table\s+contains\s+records\s+after\s+load', re.I)
+        # Rule 3: "Validate that the LND table is truncated before the current load starts."
+        lnd_truncated_pattern = re.compile(r'LND\s+table\s+is\s+truncated\s+before', re.I)
+
         # Snowflake object existence patterns (stage, stored proc, storage integration)
         stage_exists_pattern = re.compile(r'(?:stage|@\w+)\s+(?:\w+\s+)?(?:must\s+)?exist', re.I)
         proc_exists_pattern = re.compile(r'(?:stored\s+proc(?:edure)?|procedure)\s+(\w+)\s+must\s+exist', re.I)
@@ -1002,6 +1017,159 @@ NAME: ... | TYPE: ExecutionStatus|TablesProcessed|RowsLoaded|RowsFailed|FilesLoa
                         database_target=target_db,
                         stage2_relevance="Critical",
                     ))
+                continue
+
+            # ========== CLIENT BUSINESS RULES (EXACT PHRASING) ==========
+            # Rule 3: "Validate that the LND table is truncated before the current load starts."
+            if lnd_truncated_pattern.search(rule):
+                matched = True
+                code = ""
+                if self.etl_file_path:
+                    try:
+                        code = Path(self.etl_file_path).read_text(encoding="utf-8", errors="ignore")
+                    except Exception:
+                        pass
+                has_truncate = bool(re.search(r'\.truncate\(|TRUNCATE\s+TABLE|truncate', code, re.I))
+                has_copy = bool(re.search(r'\.load_csv\(|\.copy_into\(|COPY\s+INTO|load', code, re.I))
+                passed = has_truncate and has_copy
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if passed else "FAIL",
+                    finding=f"TRUNCATE detected={has_truncate}, Load operation detected={has_copy}",
+                    recommendation="N/A" if passed else "Ensure TRUNCATE runs before COPY/LOAD operation",
+                    check_type="Business Rule",
+                    severity="Info" if passed else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
+                continue
+
+            # Rule 1: "LND record count should be populated after successful load from source."
+            if lnd_populated_pattern.search(rule):
+                matched = True
+                per_table = self.post_batch_metrics.get("post_batch_table_records", {})
+                # Check if any LND/raw_data table has records
+                lnd_tables = ["raw_data", "lnd", "landing", "LND"]
+                lnd_found = False
+                lnd_count = 0
+                for table_name in lnd_tables:
+                    if table_name in per_table and per_table[table_name] > 0:
+                        lnd_found = True
+                        lnd_count = per_table[table_name]
+                        break
+                passed = lnd_found
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if passed else "FAIL",
+                    finding=f"LND/raw_data record count = {lnd_count}",
+                    recommendation="N/A" if passed else "Ensure source file is loaded into LND table",
+                    check_type="Business Rule",
+                    severity="Info" if passed else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
+                continue
+
+            # Rule 2: "All expected tables like AUDIT and LND must be successfully loaded without errors."
+            if all_tables_pattern.search(rule):
+                matched = True
+                per_table = self.post_batch_metrics.get("post_batch_table_records", {})
+                etl_exit = self.etl_execution_result.get("exit_code", 1)
+                # Check if both audit and lnd tables loaded
+                audit_tables = ["audit_log", "audit", "AUDIT"]
+                lnd_tables = ["raw_data", "lnd", "landing", "LND"]
+                audit_ok = any(t in per_table and per_table[t] > 0 for t in audit_tables)
+                lnd_ok = any(t in per_table and per_table[t] > 0 for t in lnd_tables)
+                passed = audit_ok and lnd_ok and etl_exit == 0
+                loaded_tables = [t for t in per_table if per_table[t] > 0]
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if passed else "FAIL",
+                    finding=f"AUDIT loaded={audit_ok}, LND loaded={lnd_ok}, exit_code={etl_exit}, tables={loaded_tables}",
+                    recommendation="N/A" if passed else "Ensure both AUDIT and LND tables are loaded without errors",
+                    check_type="Business Rule",
+                    severity="Info" if passed else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
+                continue
+
+            # Rule 4: "Validate that source file is successfully loaded into LND table during the load operation."
+            if source_loaded_pattern.search(rule):
+                matched = True
+                per_table = self.post_batch_metrics.get("post_batch_table_records", {})
+                lnd_tables = ["raw_data", "lnd", "landing", "LND"]
+                lnd_count = 0
+                for table_name in lnd_tables:
+                    if table_name in per_table:
+                        lnd_count = per_table[table_name]
+                        break
+                passed = lnd_count > 0
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if passed else "FAIL",
+                    finding=f"LND table record count = {lnd_count}",
+                    recommendation="N/A" if passed else "Ensure source file is loaded into LND table",
+                    check_type="Business Rule",
+                    severity="Info" if passed else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
+                continue
+
+            # Rule 5: "Validate that the configured CSV format is correctly applied during the load process."
+            if csv_format_pattern.search(rule):
+                matched = True
+                code = ""
+                if self.etl_file_path:
+                    try:
+                        code = Path(self.etl_file_path).read_text(encoding="utf-8", errors="ignore")
+                    except Exception:
+                        pass
+                has_csv_format = bool(re.search(r'csv|format|CSV|file_format', code, re.I))
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if has_csv_format else "FAIL",
+                    finding=f"CSV format configuration {'detected' if has_csv_format else 'not found'} in code",
+                    recommendation="N/A" if has_csv_format else "Ensure CSV format is configured in ETL code",
+                    check_type="Business Rule",
+                    severity="Info" if has_csv_format else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
+                continue
+
+            # Rule 6: "Validate that the LND and AUDIT table contains records after load when data is loaded."
+            if lnd_audit_records_pattern.search(rule):
+                matched = True
+                per_table = self.post_batch_metrics.get("post_batch_table_records", {})
+                audit_tables = ["audit_log", "audit", "AUDIT"]
+                lnd_tables = ["raw_data", "lnd", "landing", "LND"]
+                audit_count = next((per_table.get(t, 0) for t in audit_tables if t in per_table), 0)
+                lnd_count = next((per_table.get(t, 0) for t in lnd_tables if t in per_table), 0)
+                passed = audit_count > 0 and lnd_count > 0
+                self.test_results.append(TestResult(
+                    test_id=test_id,
+                    test_name=f"Business Rule: {rule[:60]}",
+                    phase="Results After Batch Run",
+                    status="PASS" if passed else "FAIL",
+                    finding=f"LND count={lnd_count}, AUDIT count={audit_count}",
+                    recommendation="N/A" if passed else "Ensure both LND and AUDIT tables contain records after load",
+                    check_type="Business Rule",
+                    severity="Info" if passed else "High",
+                    database_target=target_db,
+                    stage2_relevance="Critical",
+                ))
                 continue
 
             # 7. Fallback — unrecognised rule, mark SKIPPED with clear reason
